@@ -27,7 +27,7 @@ const RegisterScreen = () => {
       password: password,
       image: image,
     }
-    axios.post("http://192.168.165.75:5000/users", user).then((response) => {
+    axios.post("http://192.168.6.218:5000/users", user).then((response) => {
       console.log(response);
       Alert.alert(
         "Registration successful",

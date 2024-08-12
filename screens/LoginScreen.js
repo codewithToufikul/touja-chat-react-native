@@ -44,16 +44,17 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
         email: userEmail,
         password: password,
       }
-      axios.post("http://192.168.165.75:5000/login", user)
+      axios.post("http://192.168.6.218:5000/login", user)
       .then((response) => {
         console.log(response);
         const token = response.data.token;
         AsyncStorage.setItem("authToken", token);
         navigation.replace("Home");
+        console.log('ok');
       })
       .catch((error) => {
         Alert.alert("Login Error", "Invalid email or password");
-        console.log("Login Error", error);
+        console.log('gffd', error);
       });
     }
   

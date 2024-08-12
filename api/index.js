@@ -56,14 +56,12 @@ app.post("/users", (req, res) => {
 // jwt
 
 const createToken = (userId) => {
-    const payload = {
-      userId: userId,
-    };
-  
-    const token = jwt.sign(payload, "Q$r2K6W8n!jCW%Zk", { expiresIn: "1h" });
-  
-    return token;
+  const payload = {
+    userId: userId,
   };
+  const token = jwt.sign(payload, "Q$r2K6W8n!jCW%Zk", { expiresIn: "10h" });
+  return token;
+};
 
 //   login verify endpoint
 
@@ -75,18 +73,90 @@ app.post("/login", (req, res) => {
       .json({ message: "Email and the password are required" });
   }
 
-  User.findOne({ email }).then((user) => {
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-    if (user.password !== password) {
-      return res.status(404).json({ message: "Invalid Password!" });
-    }
-    const token = createToken(user._id);
-    res.status(200).json({ token });
-
-  }).catch((error) => {
-    console.log("error in finding the user", error);
-    res.status(500).json({ message: "Internal server Error!" });
-  });
+  User.findOne({ email })
+    .then((user) => {
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      if (user.password !== password) {
+        return res.status(404).json({ message: "Invalid Password!" });
+      }
+      const objectId = user.id;
+      const idString = objectId.toString();
+      const token = createToken(idString);
+      res.status(200).json({ token });
+    })
+    .catch((error) => {
+      console.log("error in finding the user", error);
+      res.status(500).json({ message: "Internal server Error!" });
+    });
 });
+
+//  get current logged user
+
+app.get("/userss/:userId", (req, res) => {
+  const loggedInUserId = req.params.userId;
+  User.find({ _id: { $ne: loggedInUserId } })
+    .then((users) => {
+      res.status(200).json(users);
+    })
+    .catch((err) => {
+      console.log("Error retrieving users", err);
+      res.status(500).json({ message: "Error retrieving users" });
+    });
+});
+
+// fnd req endpoint
+
+app.post("/friend-request", async (req, res) => {
+  const { currentUserId, selectedUserId } = req.body;
+
+  try {
+    //update the friendRequestsArray!
+    await User.findByIdAndUpdate(selectedUserId, {
+      $push: { friendRequest: currentUserId },
+    });
+
+    //update the sender's sentFriendRequests array
+    await User.findByIdAndUpdate(currentUserId, {
+      $push: { sentFriendsRequest: selectedUserId },
+    });
+
+    res.sendStatus(200);
+  } catch (error) {
+    res.sendStatus(500);
+  }
+});
+
+app.get("/friend-request/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    //fetch the user document based on the User id
+    const user = await User.findById(userId)
+      .populate("friendRequest", "name email image")
+      .lean();
+
+    const friendRequest = user.friendRequest;
+
+    res.json(friendRequest);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+
+
+app.get("/friend-requests/sent/:userId",async(req,res) => {
+  try{
+    const {userId} = req.params;
+    const user = await User.findById(userId).populate("sentFriendsRequest","name email image").lean();
+
+    const sentFriendsRequest = user.sentFriendsRequest;
+
+    res.json(sentFriendsRequest);
+  } catch(error){
+    console.log("error",error);
+    res.status(500).json({ error: "Internal Server" });
+  }
+})
