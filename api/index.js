@@ -175,6 +175,22 @@ app.post("/friend-request/accept", async (req, res) => {
   }
 });
 
+//endpoint to access all the friends of the logged in user!
+app.get("/accepted-friends/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findById(userId).populate(
+      "friends",
+      "name email image"
+    );
+    const acceptedFriends = user.friends;
+    res.json(acceptedFriends);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 
 app.get("/friend-requests/sent/:userId", async (req, res) => {
   try {
