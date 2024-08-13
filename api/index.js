@@ -112,19 +112,27 @@ app.post("/friend-request", async (req, res) => {
   const { currentUserId, selectedUserId } = req.body;
 
   try {
-    //update the friendRequestsArray!
+    // Check if a friend request already exists
+    const selectedUser = await User.findById(selectedUserId);
+
+    if (selectedUser.friendRequest.includes(currentUserId)) {
+      return res.status(400).json({ message: "Friend request already sent." });
+    }
+
+    // Update the friendRequestsArray of the selected user
     await User.findByIdAndUpdate(selectedUserId, {
       $push: { friendRequest: currentUserId },
     });
 
-    //update the sender's sentFriendRequests array
+    // Update the sentFriendRequests array of the current user
     await User.findByIdAndUpdate(currentUserId, {
       $push: { sentFriendsRequest: selectedUserId },
     });
 
     res.sendStatus(200);
   } catch (error) {
-    res.sendStatus(500);
+    console.error("Error sending friend request:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 });
 
@@ -145,18 +153,41 @@ app.get("/friend-request/:userId", async (req, res) => {
   }
 });
 
+app.post("/friend-request/accept", async (req, res) => {
+  try {
+    const { senderId, recepientId } = req.body;
+    const sender = await User.findById(senderId);
+    const recepient = await User.findById(recepientId);
+    sender.friends.push(recepientId);
+    recepient.friends.push(senderId);
+    recepient.friendRequest = recepient.friendRequest.filter(
+      (request) => request.toString() !== senderId.toString()
+    );
+    sender.sentFriendsRequest = sender.sentFriendsRequest.filter(
+      (request) => request.toString() !== recepientId.toString
+    );
+    await sender.save();
+    await recepient.save();
+    res.status(200).json({ message: "Friend Request accepted successfully" });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
 
 
-app.get("/friend-requests/sent/:userId",async(req,res) => {
-  try{
-    const {userId} = req.params;
-    const user = await User.findById(userId).populate("sentFriendsRequest","name email image").lean();
+app.get("/friend-requests/sent/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findById(userId)
+      .populate("sentFriendsRequest", "name email image")
+      .lean();
 
     const sentFriendsRequest = user.sentFriendsRequest;
 
     res.json(sentFriendsRequest);
-  } catch(error){
-    console.log("error",error);
+  } catch (error) {
+    console.log("error", error);
     res.status(500).json({ error: "Internal Server" });
   }
-})
+});

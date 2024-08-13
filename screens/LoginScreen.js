@@ -35,7 +35,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
           console.log("error", error);
         }
       };
-  
       checkLoginStatus();
     }, []);
 
