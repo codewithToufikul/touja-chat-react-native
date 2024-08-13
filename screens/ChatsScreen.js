@@ -13,7 +13,7 @@ const ChatsScreen = () => {
       const acceptedFriendsList = async () => {
         try {
           const response = await fetch(
-            `http://192.168.6.218:5000/accepted-friends/${userId}`
+            `http://192.168.54.75:5000/accepted-friends/${userId}`
           );
           const data = await response.json();
   
@@ -27,9 +27,6 @@ const ChatsScreen = () => {
   
       acceptedFriendsList();
     }, []);
-
-    console.log("friends", acceptedFriends);
-
     return (
         <ScrollView showsVerticalScrollIndicator={false}>
             <Pressable>

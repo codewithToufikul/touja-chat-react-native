@@ -12,7 +12,7 @@ const User = ({ item }) => {
     const fetchFriendRequests = async () => {
       try {
         const response = await fetch(
-          `http://192.168.6.218:5000/friend-requests/sent/${userId}`
+          `http://192.168.54.75:5000/friend-requests/sent/${userId}`
         );
 
         const data = await response.json();
@@ -35,7 +35,7 @@ const User = ({ item }) => {
 
   const sendFriendRequest = async (currentUserId, selectedUserId) => {
     try {
-      const response = await fetch("http://192.168.6.218:5000/friend-request", {
+      const response = await fetch("http://192.168.54.75:5000/friend-request", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -37,7 +37,7 @@ const HomeScreen = () => {
           return;
         }
         setUserId(userId);
-        const response = await axios.get(`http://192.168.6.218:5000/userss/${userId}`);
+        const response = await axios.get(`http://192.168.54.75:5000/userss/${userId}`);
         setUsers(response.data);
       } catch (error) {
         console.log("Error fetching users", error.response ? error.response.data : error.message);
