@@ -5,6 +5,7 @@ const passport = require("passport");
 const LocalStrategy = require("passport-local").Strategy;
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
+const multer = require("multer"); // Add this line to require multer
 const port = 5000;
 
 const app = express();
@@ -36,7 +37,7 @@ app.get("/", (req, res) => {
 const User = require("./models/user");
 const Message = require("./models/message");
 
-//endpoint for registration of the user
+// endpoint for registration of the user
 
 app.post("/users", (req, res) => {
   console.log("Request received at /register"); // Log for debugging
@@ -63,7 +64,7 @@ const createToken = (userId) => {
   return token;
 };
 
-//   login verify endpoint
+// login verify endpoint
 
 app.post("/login", (req, res) => {
   const { email, password } = req.body;
@@ -92,7 +93,7 @@ app.post("/login", (req, res) => {
     });
 });
 
-//  get current logged user
+// get current logged user
 
 app.get("/userss/:userId", (req, res) => {
   const loggedInUserId = req.params.userId;
@@ -106,7 +107,7 @@ app.get("/userss/:userId", (req, res) => {
     });
 });
 
-// fnd req endpoint
+// friend request endpoint
 
 app.post("/friend-request", async (req, res) => {
   const { currentUserId, selectedUserId } = req.body;
@@ -175,7 +176,7 @@ app.post("/friend-request/accept", async (req, res) => {
   }
 });
 
-//endpoint to access all the friends of the logged in user!
+// endpoint to access all the friends of the logged in user!
 app.get("/accepted-friends/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
@@ -191,7 +192,6 @@ app.get("/accepted-friends/:userId", async (req, res) => {
   }
 });
 
-
 app.get("/friend-requests/sent/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
@@ -205,5 +205,82 @@ app.get("/friend-requests/sent/:userId", async (req, res) => {
   } catch (error) {
     console.log("error", error);
     res.status(500).json({ error: "Internal Server" });
+  }
+});
+
+// multer storage configuration (make sure to configure this part correctly)
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, "files/"); // Specify the desired destination folder
+  },
+  filename: function (req, file, cb) {
+    // Generate a unique filename for the uploaded file
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + "-" + file.originalname);
+  },
+});
+
+const upload = multer({ storage: storage }); // Now multer is defined and ready to use
+
+
+// endpoint to post Messages and store it in the backend
+app.post("/messages", upload.single("imageFile"), async (req, res) => {
+  try {
+    console.log(req.file); // Add this line to debug
+    const { senderId, recepientId, messageType, messageText } = req.body;
+
+    if (!req.file && messageType === "image") {
+      return res.status(400).json({ error: "Image file is required" });
+    }
+
+    const newMessage = new Message({
+      senderId,
+      recepientId,
+      messageType,
+      message: messageText,
+      timestamp: new Date(),
+      imageUrl: messageType === "image" ? req.file.path : null,
+    });
+
+    await newMessage.save();
+    res.status(200).json({ message: "Message sent Successfully" });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+
+// endpoint to get the userDetails to design the chat Room header
+app.get("/user/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    //fetch the user data from the user ID
+    const recepientId = await User.findById(userId);
+
+    res.json(recepientId);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// endpoint to fetch the messages between two users in the chatRoom
+app.get("/messages/:senderId/:recepientId", async (req, res) => {
+  try {
+    const { senderId, recepientId } = req.params;
+
+    const messages = await Message.find({
+      $or: [
+        { senderId: senderId, recepientId: recepientId },
+        { senderId: recepientId, recepientId: senderId },
+      ],
+    }).populate("senderId", "_id name");
+
+    res.json(messages);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
