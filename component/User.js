@@ -1,12 +1,13 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import React, { useContext, useEffect, useState } from 'react';
-import { UserType } from '../UserContext';
+import { StyleSheet, Text, View, Pressable, Image, ActivityIndicator } from "react-native";
+import React, { useContext, useState, useEffect } from "react";
+import { UserType } from "../UserContext";
 
 const User = ({ item }) => {
-  const { userId, setUserId } = useContext(UserType);
+  const { userId } = useContext(UserType);
   const [requestSent, setRequestSent] = useState(false);
   const [friendRequests, setFriendRequests] = useState([]);
   const [userFriends, setUserFriends] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchFriendRequests = async () => {
@@ -18,10 +19,6 @@ const User = ({ item }) => {
         const data = await response.json();
         if (response.ok) {
           setFriendRequests(data);
-
-          // Check if a request has already been sent to this user
-          const isRequestSent = data.some((friend) => friend._id === item._id);
-          setRequestSent(isRequestSent);
         } else {
           console.log("error", response.status);
         }
@@ -30,8 +27,27 @@ const User = ({ item }) => {
       }
     };
 
+    const fetchUserFriends = async () => {
+      try {
+        const response = await fetch(`http://192.168.54.75:5000/friends/${userId}`);
+
+        const data = await response.json();
+
+        if (response.ok) {
+          setUserFriends(data);
+        } else {
+          console.log("error retrieving user friends", response.status);
+        }
+      } catch (error) {
+        console.log("Error message", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchFriendRequests();
-  }, [userId, item._id]);
+    fetchUserFriends();
+  }, []);
 
   const sendFriendRequest = async (currentUserId, selectedUserId) => {
     try {
@@ -51,9 +67,17 @@ const User = ({ item }) => {
     }
   };
 
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
+  }
+
   return (
     <Pressable
-      style={{ flexDirection: "row", alignItems: "center", marginVertical: 10, margin: 12 }}
+      style={{ flexDirection: "row", alignItems: "center", marginVertical: 10, marginHorizontal: 10 }}
     >
       <View>
         <Image
@@ -70,11 +94,11 @@ const User = ({ item }) => {
       <View style={{ marginLeft: 12, flex: 1 }}>
         <Text style={{ fontWeight: "bold" }}>{item?.name}</Text>
         <Text style={{ marginTop: 4, color: "gray" }}>{item?.email}</Text>
-      </View>
+      </View>     
       {userFriends.includes(item._id) ? (
         <Pressable
           style={{
-            backgroundColor: "#82CD47",
+            backgroundColor: "#82CD00",
             padding: 10,
             width: 105,
             borderRadius: 6,
@@ -85,7 +109,7 @@ const User = ({ item }) => {
       ) : requestSent || friendRequests.some((friend) => friend._id === item._id) ? (
         <Pressable
           style={{
-            backgroundColor: "gray",
+            backgroundColor: "#5c6e94",
             padding: 10,
             width: 105,
             borderRadius: 6,
@@ -99,7 +123,7 @@ const User = ({ item }) => {
         <Pressable
           onPress={() => sendFriendRequest(userId, item._id)}
           style={{
-            backgroundColor: "#6a5acd",
+            backgroundColor: "#427ef5",
             padding: 10,
             borderRadius: 6,
             width: 105,
@@ -116,4 +140,11 @@ const User = ({ item }) => {
 
 export default User;
 
-const styles = StyleSheet.create({});
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 400
+  },
+});

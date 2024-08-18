@@ -125,7 +125,7 @@ app.post("/friend-request", async (req, res) => {
       $push: { friendRequest: currentUserId },
     });
 
-    // Update the sentFriendRequests array of the current user
+    // Update the sentFriendsRequest array of the current user
     await User.findByIdAndUpdate(currentUserId, {
       $push: { sentFriendsRequest: selectedUserId },
     });
@@ -284,3 +284,77 @@ app.get("/messages/:senderId/:recepientId", async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
+
+//endpoint to delete the messages!
+app.post("/deleteMessages", async (req, res) => {
+  try {
+    const { messages } = req.body;
+
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ message: "invalid req body!" });
+    }
+
+    await Message.deleteMany({ _id: { $in: messages } });
+
+    res.json({ message: "Message deleted successfully" });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: "Internal Server" });
+  }
+});
+
+
+
+app.get("/friend-requests/sent/:userId",async(req,res) => {
+  try{
+    const {userId} = req.params;
+    const user = await User.findById(userId).populate("sentFriendsRequest","name email image").lean();
+
+    const sentFriendsRequest = user.sentFriendsRequest;
+
+    res.json(sentFriendsRequest);
+  } catch(error){
+    console.log("error",error);
+    res.status(500).json({ error: "Internal Server" });
+  }
+})
+
+app.get('/users/current-user/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Await the result of the database query
+    const currentUser = await User.findById(userId);
+
+    if (!currentUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Send the found user data as a response
+    res.status(200).json(currentUser);
+  } catch (error) {
+    console.error("Error fetching user:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+
+app.get("/friends/:userId",(req,res) => {
+  try{
+    const {userId} = req.params;
+
+    User.findById(userId).populate("friends").then((user) => {
+      if(!user){
+        return res.status(404).json({message: "User not found"})
+      }
+
+      const friendIds = user.friends.map((friend) => friend._id);
+
+      res.status(200).json(friendIds);
+    })
+  } catch(error){
+    console.log("error",error);
+    res.status(500).json({message:"internal server error"})
+  }
+})

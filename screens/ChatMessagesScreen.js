@@ -1,4 +1,10 @@
-import React, { useContext, useEffect, useLayoutEffect, useState } from "react";
+import React, {
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   View,
   Text,
@@ -7,6 +13,8 @@ import {
   TextInput,
   Pressable,
   Image,
+  Modal,
+  TouchableOpacity,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Entypo from "@expo/vector-icons/Entypo";
@@ -16,7 +24,8 @@ import { UserType } from "../UserContext";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as ImagePicker from "expo-image-picker";
-import imagess from "../api/files/1723616860800-164741114-image.jpg";
+import FontAwesome from '@expo/vector-icons/FontAwesome';
+import AntDesign from '@expo/vector-icons/AntDesign';
 
 const ChatMessagesScreen = () => {
   const [showEmojiSelector, setShowEmojiSelector] = useState(false);
@@ -25,10 +34,14 @@ const ChatMessagesScreen = () => {
   const [recepientData, setRecepientData] = useState();
   const [selectedImage, setSelectedImage] = useState("");
   const [message, setMessage] = useState("");
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalImageUri, setModalImageUri] = useState("");
   const { userId, setUserId } = useContext(UserType);
   const route = useRoute();
   const { recepientId } = route.params;
   const navigation = useNavigation();
+
+  const scrollViewRef = useRef(null);
 
   const handleEmojiPress = () => {
     setShowEmojiSelector(!showEmojiSelector);
@@ -44,7 +57,7 @@ const ChatMessagesScreen = () => {
       if (response.ok) {
         setMessages(data);
       } else {
-        console.log("error showing messags", response.status.message);
+        console.log("error showing messages", response.status.message);
       }
     } catch (error) {
       console.log("error fetching messages", error);
@@ -70,13 +83,17 @@ const ChatMessagesScreen = () => {
 
     fetchRecepientData();
   }, []);
+
+  useEffect(() => {
+    scrollViewRef.current?.scrollToEnd({ animated: false });
+  }, [messages]);
+
   const handleSend = async (messageType, imageUri) => {
     try {
       const formData = new FormData();
       formData.append("senderId", userId);
       formData.append("recepientId", recepientId);
 
-      //if the message type id image or a normal text
       if (messageType === "image") {
         formData.append("messageType", "image");
         formData.append("imageFile", {
@@ -105,7 +122,7 @@ const ChatMessagesScreen = () => {
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerTitle: "",
+      headerTitle: selectedMessages.length > 0 ? ` selected` : "",
       headerStyle: {
         backgroundColor: "#A770EF",
       },
@@ -123,32 +140,83 @@ const ChatMessagesScreen = () => {
               size={34}
               color="#a0a0a0"
             />
-            <Image
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 25,
-                resizeMode: "cover",
-                marginLeft: 10,
-              }}
-              source={{ uri: recepientData?.image }}
-            />
-            <Text
-              style={{
-                marginLeft: 8,
-                fontSize: 18,
-                fontWeight: "bold",
-                color: "white",
-              }}
-            >
-              {recepientData?.name}
-            </Text>
+            {selectedMessages.length > 0 ? (
+              <View
+                style={{
+                  marginLeft: 10,
+                }}
+              >
+                <Text style={{ fontSize: 20, fontWeight: "500" }}>
+                  {selectedMessages.length}
+                </Text>
+              </View>
+            ) : (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
+              >
+                <Image
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 25,
+                    resizeMode: "cover",
+                    marginLeft: 10,
+                  }}
+                  source={{ uri: recepientData?.image }}
+                />
+                <Text
+                  style={{
+                    marginLeft: 8,
+                    fontSize: 18,
+                    fontWeight: "bold",
+                    color: "white",
+                  }}
+                >
+                  {recepientData?.name}
+                </Text>
+              </View>
+            )}
           </View>
         </Pressable>
       ),
+      headerRight: () =>
+        selectedMessages.length > 0 ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 16, marginRight: 8 }}>
+            <Ionicons name="arrow-redo-outline" size={24} color="black" />
+            <Ionicons name="arrow-undo-outline" size={24} color="black" />
+            <FontAwesome name="star-o" size={24} color="black" />
+            <AntDesign onPress={() => deleteMessages(selectedMessages)} name="delete" size={24} color="red" />
+          </View>
+        ) : null,
     });
-  }, [navigation, recepientData]);
+  }, [navigation, recepientData, selectedMessages]);
 
+  const deleteMessages = async (messageIds) =>{
+    try {
+      const response = await fetch("http://192.168.54.75:5000/deleteMessages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ messages: messageIds }),
+      });
+
+      if (response.ok) {
+        setSelectedMessages((prevSelectedMessages) =>
+        prevSelectedMessages.filter((id) => !messageIds.includes(id))
+      );
+
+        fetchMessages();
+      } else {
+        console.log("error deleting messages", response.status);
+      }
+    } catch (error) {
+      console.log("error deleting messages", error);
+    }
+  }
   const formatTime = (time) => {
     const options = { hour: "numeric", minute: "numeric" };
     return new Date(time).toLocaleString("en-US", options);
@@ -156,13 +224,32 @@ const ChatMessagesScreen = () => {
 
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
-      allowsEditing: true,
-      aspect: [4, 3],
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
       quality: 1,
     });
     if (!result.canceled) {
       handleSend("image", result.assets[0].uri);
+    }
+  };
+
+  const openImageModal = (uri) => {
+    setModalImageUri(uri);
+    setModalVisible(true);
+  };
+
+  const handleSelectMessage = (message) => {
+    const isSelected = selectedMessages.includes(message._id);
+
+    if (isSelected) {
+      setSelectedMessages((previousMessages) =>
+        previousMessages.filter((id) => id !== message._id)
+      );
+    } else {
+      setSelectedMessages((previousMessages) => [
+        ...previousMessages,
+        message._id,
+      ]);
     }
   };
   return (
@@ -171,17 +258,20 @@ const ChatMessagesScreen = () => {
       style={{ flex: 1 }}
     >
       <KeyboardAvoidingView style={{ flex: 1 }}>
-        <ScrollView>
+        <ScrollView ref={scrollViewRef}>
           {messages.map((item, index) => {
+            const isSelected = selectedMessages.includes(item._id);
+
             if (item.messageType === "text") {
               return (
                 <Pressable
+                  onLongPress={() => handleSelectMessage(item)}
                   key={index}
                   style={[
                     item?.senderId?._id === userId
                       ? {
                           alignSelf: "flex-end",
-                          backgroundColor: "#ce00bd",
+                          backgroundColor: isSelected ? "#c70039" : "#ce00bd", // Change color if selected
                           padding: 8,
                           maxWidth: "60%",
                           borderTopLeftRadius: 10,
@@ -191,10 +281,12 @@ const ChatMessagesScreen = () => {
                         }
                       : {
                           alignSelf: "flex-start",
-                          backgroundColor: "white",
+                          backgroundColor: isSelected ? "#a0e4e0" : "#d2f5f7", // Change color if selected
                           padding: 8,
                           margin: 10,
-                          borderRadius: 7,
+                          borderTopLeftRadius: 7,
+                          borderTopRightRadius: 12,
+                          borderBottomLeftRadius: 13,
                           maxWidth: "60%",
                         },
                   ]}
@@ -202,19 +294,34 @@ const ChatMessagesScreen = () => {
                   <Text
                     style={[
                       item?.senderId?._id === userId
-                        ? { fontSize: 16, color: "#dcdcdc" }
-                        : { fontSize: 16, color: "black" },
+                        ? {
+                            fontSize: 16,
+                            color: isSelected ? "#ffffff" : "#dcdcdc",
+                          }
+                        : {
+                            fontSize: 16,
+                            color: isSelected ? "#000000" : "#404040",
+                          },
                     ]}
                   >
                     {item.message}
                   </Text>
                   <Text
-                    style={{
-                      textAlign: "right",
-                      fontSize: 10,
-                      color: "#404040",
-                      marginTop: 5,
-                    }}
+                    style={[
+                      item?.senderId?._id === userId
+                        ? {
+                            textAlign: "right",
+                            fontSize: 10,
+                            color: isSelected ? "#ffffff" : "black", // Change time color if selected
+                            marginTop: 3,
+                          }
+                        : {
+                            textAlign: "right",
+                            fontSize: 9,
+                            color: isSelected ? "#000000" : "#404040", // Change time color if selected
+                            marginTop: 3,
+                          },
+                    ]}
                   >
                     {formatTime(item.timeStamp)}
                   </Text>
@@ -226,45 +333,49 @@ const ChatMessagesScreen = () => {
               const imageUrl = item.imageUrl;
               const filename = imageUrl.split("\\").pop();
               const source = baseUrl + filename;
-              console.log(source);
 
               return (
                 <Pressable
                   key={index}
+                  onLongPress={() => handleSelectMessage(item)}
+                  onPress={() => openImageModal(source)}
                   style={[
                     item?.senderId?._id === userId
                       ? {
                           alignSelf: "flex-end",
-                          backgroundColor: "#DCF8C6",
-                          padding: 8,
+                          backgroundColor: isSelected ? "#c70039" : "#ce00bd",
                           maxWidth: "60%",
                           borderRadius: 7,
                           margin: 10,
+                          padding: isSelected ? 3 : 0
                         }
                       : {
                           alignSelf: "flex-start",
-                          backgroundColor: "white",
-                          padding: 8,
                           margin: 10,
+                          backgroundColor: isSelected ? "#c70039" : "#ce00bd",
                           borderRadius: 7,
                           maxWidth: "60%",
+                          padding: isSelected ? 3 : 0
                         },
                   ]}
                 >
                   <View>
                     <Image
                       source={{ uri: source }}
-                      style={{ width: 200, height: 200, borderRadius: 7 }}
+                      style={{ width: 230, height: 200, borderRadius: 7 }}
                     />
 
                     <Text
                       style={{
                         textAlign: "right",
-                        fontSize: 9,
+                        fontSize: 10,
+                        padding: 3,
+                        borderRadius: 5,
                         position: "absolute",
                         right: 10,
                         bottom: 7,
                         color: "white",
+                        backgroundColor: "#bebebe",
                         marginTop: 5,
                       }}
                     >
@@ -361,6 +472,24 @@ const ChatMessagesScreen = () => {
           />
         )}
       </KeyboardAvoidingView>
+
+      {/* Full-screen Image Modal */}
+      <Modal
+        visible={modalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+          onPress={() => setModalVisible(false)}
+        >
+          <Image
+            source={{ uri: modalImageUri }}
+            style={{ width: "100%", height: "100%", resizeMode: "contain" }}
+          />
+        </TouchableOpacity>
+      </Modal>
     </LinearGradient>
   );
 };
